@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../layout.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid p-0"><div class="row g-0">
+    <div class="col-2 sidebar" id="sidebar"></div>
+    <div class="col-10">
+        <div class="topbar">
+            <h5 class="page-title"><i class="bi bi-people me-2"></i>Personas</h5>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary" style="font-size:0.88rem;" id="bienvenida"></span>
+                <button onclick="cerrarSesion()" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Salir</button>
+            </div>
+        </div>
+        <div class="p-4">
+            <div id="alerta" class="alert" style="display:none"></div>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3" id="formTitle">Nueva Persona</h6>
+                    <input type="hidden" id="idEditar">
+                    <div class="row g-2">
+                        <div class="col-md-3"><input type="text" id="nombre" class="form-control" placeholder="Nombre *"></div>
+                        <div class="col-md-3"><input type="text" id="apellido" class="form-control" placeholder="Apellido *"></div>
+                        <div class="col-md-3">
+                            <select id="tipoPersona" class="form-select"><option value="">Tipo Persona *</option></select>
+                        </div>
+                        <div class="col-md-3"><input type="date" id="fechaNacimiento" class="form-control" placeholder="Fecha Nacimiento"></div>
+                        <div class="col-md-3"><input type="text" id="domicilio" class="form-control" placeholder="Domicilio"></div>
+                        <div class="col-md-3"><input type="text" id="telefono" class="form-control" placeholder="Teléfono" maxlength="10"></div>
+                        <div class="col-md-3"><input type="email" id="correo" class="form-control" placeholder="Correo"></div>
+                        <div class="col-md-3 d-flex gap-2">
+                            <button onclick="guardar()" class="btn btn-primary flex-fill"><i class="bi bi-save"></i> Guardar</button>
+                            <button onclick="limpiar()" class="btn btn-secondary flex-fill"><i class="bi bi-x-circle"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark"><tr><th>#</th><th>Nombre</th><th>Apellido</th><th>Tipo</th><th>Teléfono</th><th>Correo</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div></div>
+<script src="../api.js"></script><script src="../utils.js"></script>
+<script>
+document.getElementById("sidebar").innerHTML = getSidebar("persona");
+const u = checkSesion();
+if (u) document.getElementById("bienvenida").innerHTML = `<i class="bi bi-person-circle me-1"></i>${u.nombreUsuario}`;
+
+cargarSelect("tipoPersona", API.tiposPersona, "idTipoPersona", t => t.descripcion);
+
+async function cargar() {
+    const res = await fetch(API.personas);
+    const data = await res.json();
+    document.getElementById("tabla").innerHTML = data.map(p => `
+        <tr>
+            <td>${p.idPersona}</td><td>${p.nombre}</td><td>${p.apellido}</td>
+            <td>${p.tipoPersona?.descripcion||''}</td><td>${p.telefono||''}</td><td>${p.correo||''}</td>
+            <td>
+                <button class="btn btn-sm btn-warning me-1" onclick='editar(${JSON.stringify(p)})'><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${p.idPersona})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join("");
+}
+
+async function guardar() {
+    const nombre = document.getElementById("nombre").value.trim();
+    const apellido = document.getElementById("apellido").value.trim();
+    const idTipo = document.getElementById("tipoPersona").value;
+    if (!nombre || !apellido || !idTipo) return mostrarAlerta("alerta", "Nombre, apellido y tipo son requeridos");
+    const id = document.getElementById("idEditar").value;
+    const body = {
+        nombre, apellido,
+        tipoPersona: { idTipoPersona: parseInt(idTipo) },
+        fechaNacimiento: document.getElementById("fechaNacimiento").value || null,
+        domicilio: document.getElementById("domicilio").value,
+        telefono: document.getElementById("telefono").value,
+        correo: document.getElementById("correo").value
+    };
+    const url = id ? `${API.personas}/${id}` : API.personas;
+    await fetch(url, { method: id ? "PUT" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    limpiar(); cargar();
+    mostrarAlerta("alerta", "Guardado correctamente", "success");
+}
+
+function editar(p) {
+    document.getElementById("idEditar").value = p.idPersona;
+    document.getElementById("nombre").value = p.nombre;
+    document.getElementById("apellido").value = p.apellido;
+    document.getElementById("tipoPersona").value = p.tipoPersona?.idTipoPersona || "";
+    document.getElementById("fechaNacimiento").value = p.fechaNacimiento ? p.fechaNacimiento.split("T")[0] : "";
+    document.getElementById("domicilio").value = p.domicilio || "";
+    document.getElementById("telefono").value = p.telefono || "";
+    document.getElementById("correo").value = p.correo || "";
+    document.getElementById("formTitle").textContent = "Editar Persona";
+}
+
+async function eliminar(id) {
+    if (!confirm("¿Eliminar?")) return;
+    await fetch(`${API.personas}/${id}`, { method: "DELETE" });
+    cargar();
+}
+
+function limpiar() {
+    ["idEditar","nombre","apellido","fechaNacimiento","domicilio","telefono","correo"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("tipoPersona").value = "";
+    document.getElementById("formTitle").textContent = "Nueva Persona";
+}
+
+cargar();
+</script>
+</body></html>

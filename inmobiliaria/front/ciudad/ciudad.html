@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ciudades</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../layout.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid p-0"><div class="row g-0">
+    <div class="col-2 sidebar" id="sidebar"></div>
+    <div class="col-10">
+        <div class="topbar">
+            <h5 class="page-title"><i class="bi bi-geo-alt me-2"></i>Ciudades</h5>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary" style="font-size:0.88rem;" id="bienvenida"></span>
+                <button onclick="cerrarSesion()" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Salir</button>
+            </div>
+        </div>
+        <div class="p-4">
+            <div id="alerta" class="alert" style="display:none"></div>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3" id="formTitle">Nueva Ciudad</h6>
+                    <input type="hidden" id="idEditar">
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <select id="pais" class="form-select" onchange="cargarDepartamentos()">
+                                <option value="">Seleccione País *</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select id="departamento" class="form-select"><option value="">Seleccione Departamento *</option></select>
+                        </div>
+                        <div class="col-md-3"><input type="text" id="nombre" class="form-control" placeholder="Nombre de la ciudad *"></div>
+                        <div class="col-md-3 d-flex gap-2">
+                            <button onclick="guardar()" class="btn btn-primary flex-fill"><i class="bi bi-save"></i> Guardar</button>
+                            <button onclick="limpiar()" class="btn btn-secondary flex-fill"><i class="bi bi-x-circle"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark"><tr><th>#</th><th>País</th><th>Departamento</th><th>Ciudad</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div></div>
+<script src="../api.js"></script><script src="../utils.js"></script>
+<script>
+document.getElementById("sidebar").innerHTML = getSidebar("ciudad");
+const u = checkSesion();
+if (u) document.getElementById("bienvenida").innerHTML = `<i class="bi bi-person-circle me-1"></i>${u.nombreUsuario}`;
+
+cargarSelect("pais", API.paises, "idPais", p => p.nombre);
+
+async function cargarDepartamentos() {
+    const idPais = document.getElementById("pais").value;
+    const sel = document.getElementById("departamento");
+    sel.innerHTML = '<option value="">Seleccione Departamento *</option>';
+    if (!idPais) return;
+    const res = await fetch(`${API.departamentos}/por-pais/${idPais}`);
+    const data = await res.json();
+    data.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d.idDepartamento;
+        opt.textContent = d.nombre;
+        sel.appendChild(opt);
+    });
+}
+
+async function cargar() {
+    const res = await fetch(API.ciudades);
+    const data = await res.json();
+    document.getElementById("tabla").innerHTML = data.map(c => `
+        <tr>
+            <td>${c.idCiudad}</td>
+            <td>${c.departamento?.pais?.nombre||''}</td>
+            <td>${c.departamento?.nombre||''}</td>
+            <td>${c.nombre}</td>
+            <td>
+                <button class="btn btn-sm btn-warning me-1" onclick='editar(${JSON.stringify(c)})'><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${c.idCiudad})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join("");
+}
+
+async function guardar() {
+    const nombre = document.getElementById("nombre").value.trim();
+    const idDep = document.getElementById("departamento").value;
+    if (!nombre || !idDep) return mostrarAlerta("alerta", "Departamento y nombre son requeridos");
+    const id = document.getElementById("idEditar").value;
+    const body = { nombre, departamento: { idDepartamento: parseInt(idDep) } };
+    const url = id ? `${API.ciudades}/${id}` : API.ciudades;
+    await fetch(url, { method: id ? "PUT" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    limpiar(); cargar();
+    mostrarAlerta("alerta", "Guardado correctamente", "success");
+}
+
+async function editar(c) {
+    document.getElementById("idEditar").value = c.idCiudad;
+    document.getElementById("nombre").value = c.nombre;
+    // Cargar país y luego departamento
+    if (c.departamento?.pais?.idPais) {
+        document.getElementById("pais").value = c.departamento.pais.idPais;
+        await cargarDepartamentos();
+        document.getElementById("departamento").value = c.departamento.idDepartamento;
+    }
+    document.getElementById("formTitle").textContent = "Editar Ciudad";
+}
+
+async function eliminar(id) {
+    if (!confirm("¿Eliminar?")) return;
+    await fetch(`${API.ciudades}/${id}`, { method: "DELETE" });
+    cargar();
+}
+
+function limpiar() {
+    document.getElementById("idEditar").value = "";
+    document.getElementById("pais").value = "";
+    document.getElementById("departamento").innerHTML = '<option value="">Seleccione Departamento *</option>';
+    document.getElementById("nombre").value = "";
+    document.getElementById("formTitle").textContent = "Nueva Ciudad";
+}
+
+cargar();
+</script>
+</body></html>

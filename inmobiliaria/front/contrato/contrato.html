@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contratos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../layout.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid p-0"><div class="row g-0">
+    <div class="col-2 sidebar" id="sidebar"></div>
+    <div class="col-10">
+        <div class="topbar">
+            <h5 class="page-title"><i class="bi bi-file-earmark-text me-2"></i>Contratos</h5>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary" style="font-size:0.88rem;" id="bienvenida"></span>
+                <button onclick="cerrarSesion()" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Salir</button>
+            </div>
+        </div>
+        <div class="p-4">
+            <div id="alerta" class="alert" style="display:none"></div>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3" id="formTitle">Nuevo Contrato</h6>
+                    <input type="hidden" id="idEditar">
+                    <div class="row g-2">
+                        <div class="col-md-3"><select id="apartamento" class="form-select"><option value="">Apartamento *</option></select></div>
+                        <div class="col-md-3"><select id="cliente" class="form-select"><option value="">Cliente *</option></select></div>
+                        <div class="col-md-3"><select id="empleado" class="form-select"><option value="">Empleado *</option></select></div>
+                        <div class="col-md-3"><input type="date" id="fechaInicio" class="form-control" placeholder="Fecha Inicio *"></div>
+                        <div class="col-md-3"><input type="date" id="fechaFin" class="form-control" placeholder="Fecha Fin"></div>
+                        <div class="col-md-3"><input type="number" id="valorMensual" class="form-control" placeholder="Valor Mensual" step="0.01"></div>
+                        <div class="col-md-2">
+                            <select id="estado" class="form-select">
+                                <option value="ACTIVO">ACTIVO</option>
+                                <option value="FINALIZADO">FINALIZADO</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex gap-2">
+                            <button onclick="guardar()" class="btn btn-primary flex-fill"><i class="bi bi-save"></i> Guardar</button>
+                            <button onclick="limpiar()" class="btn btn-secondary flex-fill"><i class="bi bi-x-circle"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark"><tr><th>#</th><th>Apartamento</th><th>Cliente</th><th>Empleado</th><th>Inicio</th><th>Fin</th><th>Valor</th><th>Estado</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div></div>
+<script src="../api.js"></script><script src="../utils.js"></script>
+<script>
+document.getElementById("sidebar").innerHTML = getSidebar("contrato");
+const u = checkSesion();
+if (u) document.getElementById("bienvenida").innerHTML = `<i class="bi bi-person-circle me-1"></i>${u.nombreUsuario}`;
+
+cargarSelect("apartamento", API.apartamentos, "idApartamento", a => a.direccion);
+cargarSelect("cliente", API.clientes, "idCliente", c => `${c.persona?.nombre||''} ${c.persona?.apellido||''}`);
+cargarSelect("empleado", API.empleados, "idEmpleado", e => `${e.persona?.nombre||''} ${e.persona?.apellido||''}`);
+
+async function cargar() {
+    const res = await fetch(API.contratos);
+    const data = await res.json();
+    document.getElementById("tabla").innerHTML = data.map(c => `
+        <tr>
+            <td>${c.idContrato}</td>
+            <td>${c.apartamento?.direccion||''}</td>
+            <td>${c.cliente?.persona?.nombre||''} ${c.cliente?.persona?.apellido||''}</td>
+            <td>${c.empleado?.persona?.nombre||''} ${c.empleado?.persona?.apellido||''}</td>
+            <td>${c.fechaInicio ? c.fechaInicio.split('T')[0] : ''}</td>
+            <td>${c.fechaFin ? c.fechaFin.split('T')[0] : ''}</td>
+            <td>${c.valorMensual ? '$'+c.valorMensual.toLocaleString() : ''}</td>
+            <td><span class="badge ${c.estado==='ACTIVO'?'bg-success':'bg-secondary'}">${c.estado||''}</span></td>
+            <td>
+                <button class="btn btn-sm btn-warning me-1" onclick='editar(${JSON.stringify(c)})'><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${c.idContrato})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join("");
+}
+
+async function guardar() {
+    const idAp = document.getElementById("apartamento").value;
+    const idCli = document.getElementById("cliente").value;
+    const idEmp = document.getElementById("empleado").value;
+    const fechaInicio = document.getElementById("fechaInicio").value;
+    if (!idAp || !idCli || !idEmp || !fechaInicio) return mostrarAlerta("alerta", "Apartamento, cliente, empleado y fecha inicio son requeridos");
+    const id = document.getElementById("idEditar").value;
+    const body = {
+        apartamento: { idApartamento: parseInt(idAp) },
+        cliente: { idCliente: parseInt(idCli) },
+        empleado: { idEmpleado: parseInt(idEmp) },
+        fechaInicio,
+        fechaFin: document.getElementById("fechaFin").value || null,
+        valorMensual: parseFloat(document.getElementById("valorMensual").value) || null,
+        estado: document.getElementById("estado").value
+    };
+    const url = id ? `${API.contratos}/${id}` : API.contratos;
+    await fetch(url, { method: id ? "PUT" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    limpiar(); cargar();
+    mostrarAlerta("alerta", "Guardado correctamente", "success");
+}
+
+function editar(c) {
+    document.getElementById("idEditar").value = c.idContrato;
+    document.getElementById("apartamento").value = c.apartamento?.idApartamento || "";
+    document.getElementById("cliente").value = c.cliente?.idCliente || "";
+    document.getElementById("empleado").value = c.empleado?.idEmpleado || "";
+    document.getElementById("fechaInicio").value = c.fechaInicio ? c.fechaInicio.split('T')[0] : "";
+    document.getElementById("fechaFin").value = c.fechaFin ? c.fechaFin.split('T')[0] : "";
+    document.getElementById("valorMensual").value = c.valorMensual || "";
+    document.getElementById("estado").value = c.estado || "ACTIVO";
+    document.getElementById("formTitle").textContent = "Editar Contrato";
+}
+
+async function eliminar(id) {
+    if (!confirm("¿Eliminar?")) return;
+    await fetch(`${API.contratos}/${id}`, { method: "DELETE" });
+    cargar();
+}
+
+function limpiar() {
+    ["idEditar","fechaInicio","fechaFin","valorMensual"].forEach(id => document.getElementById(id).value = "");
+    ["apartamento","cliente","empleado"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("estado").value = "ACTIVO";
+    document.getElementById("formTitle").textContent = "Nuevo Contrato";
+}
+
+cargar();
+</script>
+</body></html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tipo Persona</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../layout.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid p-0"><div class="row g-0">
+    <div class="col-2 sidebar" id="sidebar"></div>
+    <div class="col-10">
+        <div class="topbar">
+            <h5 class="page-title"><i class="bi bi-tags me-2"></i>Tipo Persona</h5>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary" style="font-size:0.88rem;" id="bienvenida"></span>
+                <button onclick="cerrarSesion()" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Salir</button>
+            </div>
+        </div>
+        <div class="p-4">
+            <div id="alerta" class="alert" style="display:none"></div>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3" id="formTitle">Nuevo Tipo Persona</h6>
+                    <input type="hidden" id="idEditar">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <input type="text" id="descripcion" class="form-control" placeholder="Descripción">
+                        </div>
+                        <div class="col-md-3">
+                            <button onclick="guardar()" class="btn btn-primary w-100"><i class="bi bi-save"></i> Guardar</button>
+                        </div>
+                        <div class="col-md-3">
+                            <button onclick="limpiar()" class="btn btn-secondary w-100"><i class="bi bi-x-circle"></i> Limpiar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark"><tr><th>#</th><th>Descripción</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div></div>
+<script src="../api.js"></script>
+<script src="../utils.js"></script>
+<script>
+document.getElementById("sidebar").innerHTML = getSidebar("tipoPersona");
+const u = checkSesion();
+if (u) document.getElementById("bienvenida").innerHTML = `<i class="bi bi-person-circle me-1"></i>${u.nombreUsuario}`;
+
+async function cargar() {
+    const res = await fetch(API.tiposPersona);
+    const data = await res.json();
+    document.getElementById("tabla").innerHTML = data.map(t => `
+        <tr>
+            <td>${t.idTipoPersona}</td>
+            <td>${t.descripcion}</td>
+            <td>
+                <button class="btn btn-sm btn-warning me-1" onclick="editar(${t.idTipoPersona},'${t.descripcion}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${t.idTipoPersona})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join("");
+}
+
+async function guardar() {
+    const desc = document.getElementById("descripcion").value.trim();
+    if (!desc) return mostrarAlerta("alerta", "La descripción es requerida");
+    const id = document.getElementById("idEditar").value;
+    const url = id ? `${API.tiposPersona}/${id}` : API.tiposPersona;
+    const method = id ? "PUT" : "POST";
+    await fetch(url, { method, headers: {"Content-Type":"application/json"}, body: JSON.stringify({descripcion: desc}) });
+    limpiar(); cargar();
+    mostrarAlerta("alerta", "Guardado correctamente", "success");
+}
+
+function editar(id, desc) {
+    document.getElementById("idEditar").value = id;
+    document.getElementById("descripcion").value = desc;
+    document.getElementById("formTitle").textContent = "Editar Tipo Persona";
+}
+
+async function eliminar(id) {
+    if (!confirm("¿Eliminar?")) return;
+    await fetch(`${API.tiposPersona}/${id}`, { method: "DELETE" });
+    cargar();
+}
+
+function limpiar() {
+    document.getElementById("idEditar").value = "";
+    document.getElementById("descripcion").value = "";
+    document.getElementById("formTitle").textContent = "Nuevo Tipo Persona";
+}
+
+cargar();
+</script>
+</body>
+</html>

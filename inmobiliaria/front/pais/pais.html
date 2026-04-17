@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Países</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../layout.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid p-0"><div class="row g-0">
+    <div class="col-2 sidebar" id="sidebar"></div>
+    <div class="col-10">
+        <div class="topbar">
+            <h5 class="page-title"><i class="bi bi-globe-americas me-2"></i>Países</h5>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary" style="font-size:0.88rem;" id="bienvenida"></span>
+                <button onclick="cerrarSesion()" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Salir</button>
+            </div>
+        </div>
+        <div class="p-4">
+            <div id="alerta" class="alert" style="display:none"></div>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3" id="formTitle">Nuevo País</h6>
+                    <input type="hidden" id="idEditar">
+                    <div class="row g-2">
+                        <div class="col-md-6"><input type="text" id="nombre" class="form-control" placeholder="Nombre del país *"></div>
+                        <div class="col-md-3">
+                            <button onclick="guardar()" class="btn btn-primary w-100"><i class="bi bi-save"></i> Guardar</button>
+                        </div>
+                        <div class="col-md-3">
+                            <button onclick="limpiar()" class="btn btn-secondary w-100"><i class="bi bi-x-circle"></i> Limpiar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark"><tr><th>#</th><th>Nombre</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div></div>
+<script src="../api.js"></script><script src="../utils.js"></script>
+<script>
+document.getElementById("sidebar").innerHTML = getSidebar("pais");
+const u = checkSesion();
+if (u) document.getElementById("bienvenida").innerHTML = `<i class="bi bi-person-circle me-1"></i>${u.nombreUsuario}`;
+
+async function cargar() {
+    const res = await fetch(API.paises);
+    const data = await res.json();
+    document.getElementById("tabla").innerHTML = data.map(p => `
+        <tr>
+            <td>${p.idPais}</td><td>${p.nombre}</td>
+            <td>
+                <button class="btn btn-sm btn-warning me-1" onclick="editar(${p.idPais},'${p.nombre}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${p.idPais})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join("");
+}
+
+async function guardar() {
+    const nombre = document.getElementById("nombre").value.trim();
+    if (!nombre) return mostrarAlerta("alerta", "El nombre es requerido");
+    const id = document.getElementById("idEditar").value;
+    const url = id ? `${API.paises}/${id}` : API.paises;
+    await fetch(url, { method: id ? "PUT" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({nombre}) });
+    limpiar(); cargar();
+    mostrarAlerta("alerta", "Guardado correctamente", "success");
+}
+
+function editar(id, nombre) {
+    document.getElementById("idEditar").value = id;
+    document.getElementById("nombre").value = nombre;
+    document.getElementById("formTitle").textContent = "Editar País";
+}
+
+async function eliminar(id) {
+    if (!confirm("¿Eliminar?")) return;
+    await fetch(`${API.paises}/${id}`, { method: "DELETE" });
+    cargar();
+}
+
+function limpiar() {
+    document.getElementById("idEditar").value = "";
+    document.getElementById("nombre").value = "";
+    document.getElementById("formTitle").textContent = "Nuevo País";
+}
+
+cargar();
+</script>
+</body></html>

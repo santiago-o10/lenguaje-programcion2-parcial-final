@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../layout.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid p-0"><div class="row g-0">
+    <div class="col-2 sidebar" id="sidebar"></div>
+    <div class="col-10">
+        <div class="topbar">
+            <h5 class="page-title"><i class="bi bi-person-lock me-2"></i>Usuarios</h5>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary" style="font-size:0.88rem;" id="bienvenida"></span>
+                <button onclick="cerrarSesion()" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Salir</button>
+            </div>
+        </div>
+        <div class="p-4">
+            <div id="alerta" class="alert" style="display:none"></div>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3" id="formTitle">Nuevo Usuario</h6>
+                    <input type="hidden" id="idEditar">
+                    <div class="row g-2">
+                        <div class="col-md-3"><select id="persona" class="form-select"><option value="">Persona *</option></select></div>
+                        <div class="col-md-3"><select id="perfil" class="form-select"><option value="">Perfil *</option></select></div>
+                        <div class="col-md-3"><input type="text" id="nombreUsuario" class="form-control" placeholder="Nombre de usuario *"></div>
+                        <div class="col-md-3"><input type="password" id="clave" class="form-control" placeholder="Contraseña *"></div>
+                        <div class="col-md-4 d-flex gap-2">
+                            <button onclick="guardar()" class="btn btn-primary flex-fill"><i class="bi bi-save"></i> Guardar</button>
+                            <button onclick="limpiar()" class="btn btn-secondary flex-fill"><i class="bi bi-x-circle"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark"><tr><th>#</th><th>Usuario</th><th>Persona</th><th>Perfil</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div></div>
+<script src="../api.js"></script><script src="../utils.js"></script>
+<script>
+document.getElementById("sidebar").innerHTML = getSidebar("usuario");
+const u = checkSesion();
+if (u) document.getElementById("bienvenida").innerHTML = `<i class="bi bi-person-circle me-1"></i>${u.nombreUsuario}`;
+
+cargarSelect("persona", API.personas, "idPersona", p => `${p.nombre} ${p.apellido}`);
+cargarSelect("perfil", API.perfiles, "idPerfil", p => p.descripcion);
+
+async function cargar() {
+    const res = await fetch(API.usuarios);
+    const data = await res.json();
+    document.getElementById("tabla").innerHTML = data.map(u => `
+        <tr>
+            <td>${u.idUsuario}</td><td>${u.nombreUsuario}</td>
+            <td>${u.persona?.nombre||''} ${u.persona?.apellido||''}</td>
+            <td>${u.perfil?.descripcion||''}</td>
+            <td>
+                <button class="btn btn-sm btn-warning me-1" onclick='editar(${JSON.stringify(u)})'><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${u.idUsuario})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join("");
+}
+
+async function guardar() {
+    const idPersona = document.getElementById("persona").value;
+    const idPerfil = document.getElementById("perfil").value;
+    const nombreUsuario = document.getElementById("nombreUsuario").value.trim();
+    const clave = document.getElementById("clave").value;
+    if (!idPersona || !idPerfil || !nombreUsuario || !clave) return mostrarAlerta("alerta", "Todos los campos son requeridos");
+    const id = document.getElementById("idEditar").value;
+    const body = {
+        persona: { idPersona: parseInt(idPersona) },
+        perfil: { idPerfil: parseInt(idPerfil) },
+        nombreUsuario, clave
+    };
+    const url = id ? `${API.usuarios}/${id}` : `${API.usuarios}/registrar`;
+    await fetch(url, { method: id ? "PUT" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    limpiar(); cargar();
+    mostrarAlerta("alerta", "Guardado correctamente", "success");
+}
+
+function editar(u) {
+    document.getElementById("idEditar").value = u.idUsuario;
+    document.getElementById("persona").value = u.persona?.idPersona || "";
+    document.getElementById("perfil").value = u.perfil?.idPerfil || "";
+    document.getElementById("nombreUsuario").value = u.nombreUsuario || "";
+    document.getElementById("clave").value = "";
+    document.getElementById("formTitle").textContent = "Editar Usuario";
+}
+
+async function eliminar(id) {
+    if (!confirm("¿Eliminar?")) return;
+    await fetch(`${API.usuarios}/${id}`, { method: "DELETE" });
+    cargar();
+}
+
+function limpiar() {
+    ["idEditar","nombreUsuario","clave"].forEach(id => document.getElementById(id).value = "");
+    ["persona","perfil"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("formTitle").textContent = "Nuevo Usuario";
+}
+
+cargar();
+</script>
+</body></html>

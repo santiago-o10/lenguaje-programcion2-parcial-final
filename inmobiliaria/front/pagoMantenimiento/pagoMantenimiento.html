@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagos de Mantenimiento</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../layout.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid p-0"><div class="row g-0">
+    <div class="col-2 sidebar" id="sidebar"></div>
+    <div class="col-10">
+        <div class="topbar">
+            <h5 class="page-title"><i class="bi bi-receipt me-2"></i>Pagos de Mantenimiento</h5>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary" style="font-size:0.88rem;" id="bienvenida"></span>
+                <button onclick="cerrarSesion()" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Salir</button>
+            </div>
+        </div>
+        <div class="p-4">
+            <div id="alerta" class="alert" style="display:none"></div>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3" id="formTitle">Nuevo Pago de Mantenimiento</h6>
+                    <input type="hidden" id="idEditar">
+                    <div class="row g-2">
+                        <div class="col-md-3"><select id="mantenimiento" class="form-select"><option value="">Mantenimiento *</option></select></div>
+                        <div class="col-md-3"><select id="formaPago" class="form-select"><option value="">Forma de Pago *</option></select></div>
+                        <div class="col-md-2"><input type="date" id="fechaPago" class="form-control"></div>
+                        <div class="col-md-2"><input type="number" id="valor" class="form-control" placeholder="Valor *" step="0.01"></div>
+                        <div class="col-md-4"><input type="text" id="observaciones" class="form-control" placeholder="Observaciones"></div>
+                        <div class="col-md-4 d-flex gap-2">
+                            <button onclick="guardar()" class="btn btn-primary flex-fill"><i class="bi bi-save"></i> Guardar</button>
+                            <button onclick="limpiar()" class="btn btn-secondary flex-fill"><i class="bi bi-x-circle"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark"><tr><th>#</th><th>Mantenimiento</th><th>Forma Pago</th><th>Fecha</th><th>Valor</th><th>Observaciones</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div></div>
+<script src="../api.js"></script><script src="../utils.js"></script>
+<script>
+document.getElementById("sidebar").innerHTML = getSidebar("pagoMantenimiento");
+const u = checkSesion();
+if (u) document.getElementById("bienvenida").innerHTML = `<i class="bi bi-person-circle me-1"></i>${u.nombreUsuario}`;
+
+cargarSelect("mantenimiento", API.mantenimientos, "idMantenimiento", m => `#${m.idMantenimiento} - ${m.apartamento?.direccion||''}`);
+cargarSelect("formaPago", API.formasPago, "idFormaPago", f => f.descripcion);
+
+async function cargar() {
+    const res = await fetch(API.pagosMantenimiento);
+    const data = await res.json();
+    document.getElementById("tabla").innerHTML = data.map(p => `
+        <tr>
+            <td>${p.idPagoMantenimiento}</td>
+            <td>#${p.mantenimiento?.idMantenimiento} - ${p.mantenimiento?.apartamento?.direccion||''}</td>
+            <td>${p.formaPago?.descripcion||''}</td>
+            <td>${p.fechaPago ? p.fechaPago.split('T')[0] : ''}</td>
+            <td>$${p.valor?.toLocaleString()||''}</td>
+            <td>${p.observaciones||''}</td>
+            <td>
+                <button class="btn btn-sm btn-warning me-1" onclick='editar(${JSON.stringify(p)})'><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${p.idPagoMantenimiento})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join("");
+}
+
+async function guardar() {
+    const idMant = document.getElementById("mantenimiento").value;
+    const idFP = document.getElementById("formaPago").value;
+    const fechaPago = document.getElementById("fechaPago").value;
+    const valor = document.getElementById("valor").value;
+    if (!idMant || !idFP || !fechaPago || !valor) return mostrarAlerta("alerta", "Todos los campos marcados son requeridos");
+    const id = document.getElementById("idEditar").value;
+    const body = {
+        mantenimiento: { idMantenimiento: parseInt(idMant) },
+        formaPago: { idFormaPago: parseInt(idFP) },
+        fechaPago, valor: parseFloat(valor),
+        observaciones: document.getElementById("observaciones").value
+    };
+    const url = id ? `${API.pagosMantenimiento}/${id}` : API.pagosMantenimiento;
+    await fetch(url, { method: id ? "PUT" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    limpiar(); cargar();
+    mostrarAlerta("alerta", "Guardado correctamente", "success");
+}
+
+function editar(p) {
+    document.getElementById("idEditar").value = p.idPagoMantenimiento;
+    document.getElementById("mantenimiento").value = p.mantenimiento?.idMantenimiento || "";
+    document.getElementById("formaPago").value = p.formaPago?.idFormaPago || "";
+    document.getElementById("fechaPago").value = p.fechaPago ? p.fechaPago.split('T')[0] : "";
+    document.getElementById("valor").value = p.valor || "";
+    document.getElementById("observaciones").value = p.observaciones || "";
+    document.getElementById("formTitle").textContent = "Editar Pago de Mantenimiento";
+}
+
+async function eliminar(id) {
+    if (!confirm("¿Eliminar?")) return;
+    await fetch(`${API.pagosMantenimiento}/${id}`, { method: "DELETE" });
+    cargar();
+}
+
+function limpiar() {
+    ["idEditar","fechaPago","valor","observaciones"].forEach(id => document.getElementById(id).value = "");
+    ["mantenimiento","formaPago"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("formTitle").textContent = "Nuevo Pago de Mantenimiento";
+}
+
+cargar();
+</script>
+</body></html>

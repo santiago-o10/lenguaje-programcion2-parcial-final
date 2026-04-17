@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../layout.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid p-0"><div class="row g-0">
+    <div class="col-2 sidebar" id="sidebar"></div>
+    <div class="col-10">
+        <div class="topbar">
+            <h5 class="page-title"><i class="bi bi-person-check me-2"></i>Clientes</h5>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary" style="font-size:0.88rem;" id="bienvenida"></span>
+                <button onclick="cerrarSesion()" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Salir</button>
+            </div>
+        </div>
+        <div class="p-4">
+            <div id="alerta" class="alert" style="display:none"></div>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3" id="formTitle">Nuevo Cliente</h6>
+                    <input type="hidden" id="idEditar">
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <select id="persona" class="form-select"><option value="">Seleccione Persona *</option></select>
+                        </div>
+                        <div class="col-md-4"><input type="text" id="observaciones" class="form-control" placeholder="Observaciones"></div>
+                        <div class="col-md-3 d-flex gap-2">
+                            <button onclick="guardar()" class="btn btn-primary flex-fill"><i class="bi bi-save"></i> Guardar</button>
+                            <button onclick="limpiar()" class="btn btn-secondary flex-fill"><i class="bi bi-x-circle"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark"><tr><th>#</th><th>Persona</th><th>Observaciones</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div></div>
+<script src="../api.js"></script><script src="../utils.js"></script>
+<script>
+document.getElementById("sidebar").innerHTML = getSidebar("cliente");
+const u = checkSesion();
+if (u) document.getElementById("bienvenida").innerHTML = `<i class="bi bi-person-circle me-1"></i>${u.nombreUsuario}`;
+
+cargarSelect("persona", API.personas, "idPersona", p => `${p.nombre} ${p.apellido}`);
+
+async function cargar() {
+    const res = await fetch(API.clientes);
+    const data = await res.json();
+    document.getElementById("tabla").innerHTML = data.map(c => `
+        <tr>
+            <td>${c.idCliente}</td>
+            <td>${c.persona?.nombre||''} ${c.persona?.apellido||''}</td>
+            <td>${c.observaciones||''}</td>
+            <td>
+                <button class="btn btn-sm btn-warning me-1" onclick='editar(${JSON.stringify(c)})'><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${c.idCliente})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join("");
+}
+
+async function guardar() {
+    const idPersona = document.getElementById("persona").value;
+    if (!idPersona) return mostrarAlerta("alerta", "Seleccione una persona");
+    const id = document.getElementById("idEditar").value;
+    const body = { persona: { idPersona: parseInt(idPersona) }, observaciones: document.getElementById("observaciones").value };
+    const url = id ? `${API.clientes}/${id}` : API.clientes;
+    await fetch(url, { method: id ? "PUT" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    limpiar(); cargar();
+    mostrarAlerta("alerta", "Guardado correctamente", "success");
+}
+
+function editar(c) {
+    document.getElementById("idEditar").value = c.idCliente;
+    document.getElementById("persona").value = c.persona?.idPersona || "";
+    document.getElementById("observaciones").value = c.observaciones || "";
+    document.getElementById("formTitle").textContent = "Editar Cliente";
+}
+
+async function eliminar(id) {
+    if (!confirm("¿Eliminar?")) return;
+    await fetch(`${API.clientes}/${id}`, { method: "DELETE" });
+    cargar();
+}
+
+function limpiar() {
+    document.getElementById("idEditar").value = "";
+    document.getElementById("persona").value = "";
+    document.getElementById("observaciones").value = "";
+    document.getElementById("formTitle").textContent = "Nuevo Cliente";
+}
+
+cargar();
+</script>
+</body></html>
